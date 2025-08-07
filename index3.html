@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .file-upload {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+        }
+        
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
+        }
+        
+        .clear-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+        
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+        
+        .packet-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .stat-red { background: linear-gradient(45deg, #ff6b6b, #ee5a52); }
+        .stat-blue { background: linear-gradient(45deg, #4facfe, #00f2fe); }
+        .stat-green { background: linear-gradient(45deg, #43e97b, #38f9d7); }
+        .stat-yellow { background: linear-gradient(45deg, #fa709a, #fee140); }
+        
+        .table-container {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
+            position: relative;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        /* Row coloring based on packet types */
+        .packet-row-9 { 
+            background-color: rgba(240, 49, 49, 0.74) !important; 
+        }
+        .packet-row-10 { 
+            background-color: rgba(38, 146, 241, 0.774) !important; 
+        }
+        .packet-row-11 { 
+            background-color: rgba(231, 201, 31, 0.801) !important; 
+        }
+        .packet-row-13 { 
+            background-color: rgba(18, 247, 94, 0.795) !important; 
+        }
+        
+        .packet-row-9:hover { 
+            background-color: rgba(255, 107, 107, 0.699) !important; 
+        }
+        .packet-row-10:hover { 
+            background-color: rgba(79, 172, 254, 0.692) !important; 
+        }
+        .packet-row-11:hover { 
+            background-color: rgba(254, 225, 64, 0.678) !important; 
+        }
+        .packet-row-13:hover { 
+            background-color: rgba(67, 233, 122, 0.719) !important; 
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #495057;
+        }
+        
+        /* Tooltip styles */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .tooltip.show {
+            opacity: 1;
+        }
+        
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: rgba(0, 0, 0, 0.9) transparent transparent transparent;
+        }
+        
+        /* Cell hover effect */
+        td:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📡 Packet Analyzer</h1>
+            <p>Upload XLSX files to analyze different packet types with color-coded visualization</p>
+        </div>
+        
+        <div class="file-upload">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <label for="fileInput" class="file-input-label">
+                    📁 Choose XLSX File
+                </label>
+            </div>
+            <button class="clear-btn" onclick="clearData()">🗑️ Clear Data</button>
+        </div>
+        
+        <div class="packet-stats" id="stats" style="display: none;">
+            <div class="stat-card stat-red">
+                <div>StationToLoco (RED)</div>
+                <div id="stat-red">0 packets</div>
+            </div>
+            <div class="stat-card stat-blue">
+                <div>LocoToStation (BLUE)</div>
+                <div id="stat-blue">0 packets</div>
+            </div>
+            <div class="stat-card stat-green">
+                <div>AccessRequest (GREEN)</div>
+                <div id="stat-green">0 packets</div>
+            </div>
+            <div class="stat-card stat-yellow">
+                <div>AccessAuthority (YELLOW)</div>
+                <div id="stat-yellow">0 packets</div>
+            </div>
+        </div>
+        
+        <div id="packetSections">
+            <div id="loading" class="loading" style="display: none;">
+                <p>📊 Processing file...</p>
+            </div>
+            <div id="noData" class="no-data">
+                <p>📂 Please upload an XLSX file to begin packet analysis</p>
+            </div>
+        </div>
+        
+        <!-- Tooltip element -->
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+
+    <script>
+        // Packet type definitions
+        const PACKET_TYPES = {
+            9: {
+                name: 'StationToLoco-Packets',
+                color: 'red',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'StationID', 'StationVer', 'LocoID', 'RefProfileNum', 'LastRefRfid', 'DistPktStart', 'PacketDir', 'SubPktType', 'SubPktLen', 'FrameOffset', 'SOS', 'SecType', 'CurSigInfo', 'CurSigAspect', 'NxtSigAspect', 'ApproachingSigDist', 'AuthType', 'AuthSpeed', 'MA', 'ShortMA', 'RevMA', 'TLsts', 'TLtype', 'RefFN', 'RefOff', 'NxtStnHO', 'NxtStationId']
+            },
+            10: {
+                name: 'LocoToStation-Packet',
+                color: 'blue',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'LocoID', 'LocoVer', 'AbsLoc', 'L_DO', 'L_DU', 'TrainInt', 'TrainLen', 'TrainSpeed', 'DoM', 'SOS', 'Mode', 'LastReadTag', 'TagDup', 'TagLinkInfo', 'TIN', 'Brake', 'NewMAReply', 'LastRefProfId', 'SigOV', 'Info-Ack', 'Spare', 'LocoHealth']
+            },
+            11: {
+                name: 'AccessAuthority-Packet',
+                color: 'yellow',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'StationID', 'StationVer', 'StnLoc', 'LocoId', 'UpLink', 'DnLink', 'TDMASlot', 'RS', 'StationTDMA']
+            },
+            13: {
+                name: 'AccessRequest-Packet',
+                color: 'green',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'LocoID', 'LocoVer', 'AbsLoc', 'TrainLen', 'TrainSpeed', 'DoM', 'SOS', 'Mode', 'ApproachingStationID', 'LastReadTag', 'TIN', 'Longitude', 'Latitude', 'RL']
+            }
+        };
+
+        let allPackets = [];
+        let tooltip = null;
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const loadingElem = document.getElementById('loading');
+            if (loadingElem) loadingElem.style.display = 'block';
+            const noDataElem = document.getElementById('noData');
+            if (noDataElem) noDataElem.style.display = 'none';
+
+            document.getElementById('packetSections').innerHTML = '<div id="loading" class="loading"><p>📊 Processing file...</p></div>';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    processData(jsonData);
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData(rawData) {
+            allPackets = [];
+            const stats = { red: 0, blue: 0, green: 0, yellow: 0 };
+
+            rawData.forEach((row, index) => {
+                if (row.length === 0) return;
+                
+                const packetType = parseInt(row[0]);
+                const packetInfo = PACKET_TYPES[packetType];
+                
+                if (packetInfo) {
+                    const processedRow = {
+                        rowIndex: index,
+                        packetType: packetType,
+                        color: packetInfo.color,
+                        data: row
+                    };
+
+                    allPackets.push(processedRow);
+                    stats[packetInfo.color]++;
+                }
+            });
+
+            updateStats(stats);
+            createUnifiedTable();
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('stats').style.display = 'grid';
+        }
+
+        function updateStats(stats) {
+            document.getElementById('stat-red').textContent = `${stats.red} packets`;
+            document.getElementById('stat-blue').textContent = `${stats.blue} packets`;
+            document.getElementById('stat-green').textContent = `${stats.green} packets`;
+            document.getElementById('stat-yellow').textContent = `${stats.yellow} packets`;
+        }
+
+        function createUnifiedTable() {
+            const sectionsContainer = document.getElementById('packetSections');
+            
+            if (allPackets.length === 0) {
+                sectionsContainer.innerHTML = '<div class="no-data"><p>📂 No valid packet data found</p></div>';
+                return;
+            }
+
+            // Find maximum number of columns across all packet types
+            const maxColumns = Math.max(...Object.values(PACKET_TYPES).map(type => type.columns.length));
+
+            sectionsContainer.innerHTML = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Row</th>
+                                ${Array.from({ length: maxColumns }, (_, i) => `<th>Col ${i + 1}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="unifiedTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            updateUnifiedTable();
+            initializeTooltip();
+        }
+
+        function updateUnifiedTable() {
+            const tbody = document.getElementById('unifiedTableBody');
+            
+            tbody.innerHTML = allPackets.map(packet => {
+                const maxColumns = Math.max(...Object.values(PACKET_TYPES).map(type => type.columns.length));
+                
+                return `
+                    <tr class="packet-row-${packet.packetType}">
+                        <td>${packet.rowIndex + 1}</td>
+                        ${Array.from({ length: maxColumns }, (_, colIndex) => {
+                            const value = (packet.data[colIndex] !== undefined && packet.data[colIndex] !== null) ? packet.data[colIndex] : '';
+
+                            return `<td data-packet-type="${packet.packetType}" data-column-index="${colIndex}">${value}</td>`;
+                        }).join('')}
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function initializeTooltip() {
+            tooltip = document.getElementById('tooltip');
+            const table = document.querySelector('table');
+            
+            if (!table) return;
+
+            table.addEventListener('mouseover', function(e) {
+                if (e.target.tagName === 'TD' && e.target.hasAttribute('data-packet-type')) {
+                    showTooltip(e);
+                }
+            });
+
+            table.addEventListener('mouseout', function(e) {
+                if (e.target.tagName === 'TD') {
+                    hideTooltip();
+                }
+            });
+
+            table.addEventListener('mousemove', function(e) {
+                if (e.target.tagName === 'TD' && e.target.hasAttribute('data-packet-type')) {
+                    updateTooltipPosition(e);
+                }
+            });
+        }
+
+        function showTooltip(e) {
+            const cell = e.target;
+            const packetType = parseInt(cell.getAttribute('data-packet-type'));
+            const columnIndex = parseInt(cell.getAttribute('data-column-index'));
+            
+            const packetInfo = PACKET_TYPES[packetType];
+            if (!packetInfo) return;
+
+            let columnName = '';
+            if (columnIndex < packetInfo.columns.length) {
+                columnName = packetInfo.columns[columnIndex];
+            } else {
+                columnName = `Empty Column ${columnIndex + 1}`;
+            }
+
+            tooltip.textContent = `${columnName} (${packetInfo.name})`;
+            tooltip.classList.add('show');
+            updateTooltipPosition(e);
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('show');
+        }
+
+        function updateTooltipPosition(e) {
+            const rect = tooltip.getBoundingClientRect();
+            const x = e.pageX - rect.width / 2;
+            const y = e.pageY - rect.height-50;
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function clearData() {
+            allPackets = [];
+            document.getElementById('fileInput').value = '';
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('packetSections').innerHTML = '<div id="noData" class="no-data"><p>📂 Please upload an XLSX file to begin packet analysis</p></div>';
+        }
+    </script>
+</body>
+</html>

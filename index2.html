@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .file-upload {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+        }
+        
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.6);
+        }
+        
+        .clear-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+        
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+        
+        .packet-stats {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .packet-stats h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .packet-stats p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .packet-section {
+            margin-bottom: 40px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .packet-header {
+            padding: 15px 20px;
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(45deg, #43e97b, #38f9d7);
+        }
+        
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+            background: white;
+            display: none;
+            position: relative;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
+            position: relative;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.3s ease;
+        }
+        
+        th:hover {
+            background: #e9ecef;
+        }
+        
+        th.filtered {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        th::after {
+            content: ' ▼';
+            font-size: 10px;
+            opacity: 0.5;
+            margin-left: 5px;
+        }
+        
+        tbody tr {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .packet-type-9 { 
+            background-color: rgba(255, 107, 107, 0.1); 
+            border-left: 4px solid #ff6b6b;
+        }
+        .packet-type-10 { 
+            background-color: rgba(79, 172, 254, 0.1); 
+            border-left: 4px solid #4facfe;
+        }
+        .packet-type-11 { 
+            background-color: rgba(254, 225, 64, 0.1); 
+            border-left: 4px solid #fee140;
+        }
+        .packet-type-13 { 
+            background-color: rgba(67, 233, 123, 0.1); 
+            border-left: 4px solid #43e97b;
+        }
+        
+        tbody tr:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            z-index: 5;
+        }
+        
+        .filter-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .filter-search {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .filter-search:focus {
+            border-bottom-color: #4facfe;
+        }
+        
+        .filter-options {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .filter-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 1px solid #f8f9fa;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-option:hover {
+            background: #f8f9fa;
+        }
+        
+        .filter-option input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        .filter-actions {
+            padding: 10px;
+            border-top: 2px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .filter-btn {
+            flex: 1;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .apply-btn {
+            background: #28a745;
+            color: white;
+        }
+        
+        .clear-btn-small {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px;
+            background: white;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #495057;
+        }
+        
+        .count-badge {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+        
+        .row-details {
+            position: absolute;
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: none;
+            pointer-events: none;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            white-space: normal;
+        }
+        
+        .row-details h4 {
+            margin-bottom: 10px;
+            color: #3498db;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 5px;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #ecf0f1;
+        }
+        
+        .detail-value {
+            color: #bdc3c7;
+            max-width: 200px;
+            word-break: break-word;
+        }
+        
+        .packet-type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .badge-9 { background: linear-gradient(45deg, #ff6b6b, #ee5a52); }
+        .badge-10 { background: linear-gradient(45deg, #4facfe, #00f2fe); }
+        .badge-11 { background: linear-gradient(45deg, #fa709a, #fee140); }
+        .badge-13 { background: linear-gradient(45deg, #43e97b, #38f9d7); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📡 Packet Analyzer</h1>
+            <p>Upload XLSX files to analyze all packet types in a unified view with hover details</p>
+        </div>
+        
+        <div class="file-upload">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <label for="fileInput" class="file-input-label">
+                    📁 Choose XLSX File
+                </label>
+            </div>
+            <button class="clear-btn" onclick="clearData()">🗑️ Clear Data</button>
+        </div>
+        
+        <div class="packet-stats" id="stats" style="display: none;">
+            <h2 id="totalPackets">0 Total Packets</h2>
+            <p id="packetBreakdown">Ready to analyze your packet data</p>
+        </div>
+        
+        <div id="packetSections">
+            <div id="loading" class="loading" style="display: none;">
+                <p>📊 Processing file...</p>
+            </div>
+            <div id="noData" class="no-data">
+                <p>📂 Please upload an XLSX file to begin packet analysis</p>
+            </div>
+        </div>
+        
+        <div class="row-details" id="rowDetails"></div>
+    </div>
+
+    <script>
+        // Packet type definitions
+        const PACKET_TYPES = {
+            9: {
+                name: 'StationToLoco',
+                color: 'red',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'StationID', 'StationVer', 'LocoID', 'RefProfileNum', 'LastRefRfid', 'DistPktStart', 'PacketDir', 'SubPktType', 'SubPktLen', 'FrameOffset', 'SOS', 'SecType', 'CurSigInfo', 'CurSigAspect', 'NxtSigAspect', 'ApproachingSigDist', 'AuthType', 'AuthSpeed', 'MA', 'ShortMA', 'RevMA', 'TLsts', 'TLtype', 'RefFN', 'RefOff', 'NxtStnHO', 'NxtStationId']
+            },
+            10: {
+                name: 'LocoToStation',
+                color: 'blue',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'LocoID', 'LocoVer', 'AbsLoc', 'L_DO', 'L_DU', 'TrainInt', 'TrainLen', 'TrainSpeed', 'DoM', 'SOS', 'Mode', 'LastReadTag', 'TagDup', 'TagLinkInfo', 'TIN', 'Brake', 'NewMAReply', 'LastRefProfId', 'SigOV', 'Info-Ack', 'Spare', 'LocoHealth']
+            },
+            11: {
+                name: 'AccessAuthority',
+                color: 'yellow',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'StationID', 'StationVer', 'StnLoc', 'LocoId', 'UpLink', 'DnLink', 'TDMASlot', 'RS', 'StationTDMA']
+            },
+            13: {
+                name: 'AccessRequest',
+                color: 'green',
+                columns: ['PacketType', 'PacketLen', 'FrameNum', 'LocoID', 'LocoVer', 'AbsLoc', 'TrainLen', 'TrainSpeed', 'DoM', 'SOS', 'Mode', 'ApproachingStationID', 'LastReadTag', 'TIN', 'Longitude', 'Latitude', 'RL']
+            }
+        };
+
+        let currentData = [];
+        let filteredData = [];
+        let columnFilters = {};
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const loadingElem = document.getElementById('loading');
+            if (loadingElem) loadingElem.style.display = 'block';
+            const noDataElem = document.getElementById('noData');
+            if (noDataElem) noDataElem.style.display = 'none';
+
+            document.getElementById('packetSections').innerHTML = '<div id="loading" class="loading"><p>📊 Processing file...</p></div>';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    processData(jsonData);
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processData(rawData) {
+            currentData = [];
+            const stats = { 9: 0, 10: 0, 11: 0, 13: 0 };
+            columnFilters = {};
+
+            rawData.forEach((row, index) => {
+                if (row.length === 0) return;
+                
+                const packetType = parseInt(row[0]);
+                const packetInfo = PACKET_TYPES[packetType];
+                
+                if (packetInfo) {
+                    const processedRow = {
+                        rowIndex: index,
+                        packetType: packetType,
+                        typeName: packetInfo.name,
+                        data: {}
+                    };
+
+                    // Map data to columns
+                    packetInfo.columns.forEach((col, colIndex) => {
+                        processedRow.data[col] = row[colIndex] || '';
+                    });
+
+                    currentData.push(processedRow);
+                    stats[packetType]++;
+                }
+            });
+
+            // Initialize filtered data
+            filteredData = [...currentData];
+
+            updateStats(stats);
+            createUnifiedTable();
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('stats').style.display = 'block';
+        }
+
+        function updateStats(stats) {
+            const total = Object.values(stats).reduce((sum, count) => sum + count, 0);
+            document.getElementById('totalPackets').textContent = `${total} Total Packets`;
+            
+            const breakdown = Object.entries(stats)
+                .filter(([_, count]) => count > 0)
+                .map(([type, count]) => `${PACKET_TYPES[type].name}: ${count}`)
+                .join(' • ');
+            
+            document.getElementById('packetBreakdown').textContent = breakdown;
+        }
+
+        function createUnifiedTable() {
+            const sectionsContainer = document.getElementById('packetSections');
+            sectionsContainer.innerHTML = '';
+
+            if (currentData.length === 0) return;
+
+            const section = document.createElement('div');
+            section.className = 'packet-section';
+            section.innerHTML = `
+                <div class="packet-header">
+                    <span>📦 All Packets (Unified View)</span>
+                    <div>
+                        <span class="count-badge">${currentData.length} packets</span>
+                        <button class="toggle-btn" onclick="toggleSection('unified-table')">Show</button>
+                    </div>
+                </div>
+                <div class="table-container" id="unified-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th onclick="showColumnFilter(event, 'Row')">Row</th>
+                                <th onclick="showColumnFilter(event, 'PacketType')">Packet Type</th>
+                                <th onclick="showColumnFilter(event, 'TypeName')">Type Name</th>
+                                <th onclick="showColumnFilter(event, 'PacketLen')">Packet Length</th>
+                                <th onclick="showColumnFilter(event, 'FrameNum')">Frame Number</th>
+                                <th>Details (Hover)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unified-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            sectionsContainer.appendChild(section);
+            updateTableData();
+        }
+
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const button = section.previousElementSibling.querySelector('.toggle-btn');
+            
+            if (section.style.display === 'none' || section.style.display === '') {
+                section.style.display = 'block';
+                button.textContent = 'Hide';
+            } else {
+                section.style.display = 'none';
+                button.textContent = 'Show';
+            }
+        }
+
+        function showColumnFilter(event, column) {
+            // Close any existing dropdowns
+            document.querySelectorAll('.filter-dropdown').forEach(dropdown => {
+                dropdown.remove();
+            });
+
+            const th = event.target;
+            const dropdown = document.createElement('div');
+            dropdown.className = 'filter-dropdown';
+            dropdown.style.display = 'block';
+
+            // Get unique values for this column
+            let uniqueValues = [];
+            if (column === 'Row') {
+                uniqueValues = currentData.map(row => row.rowIndex + 1);
+            } else if (column === 'PacketType') {
+                uniqueValues = [...new Set(currentData.map(row => row.packetType))];
+            } else if (column === 'TypeName') {
+                uniqueValues = [...new Set(currentData.map(row => row.typeName))];
+            } else {
+                uniqueValues = [...new Set(
+                    currentData
+                        .map(row => row.data[column])
+                        .filter(val => val !== undefined && val !== '')
+                )];
+            }
+            uniqueValues.sort();
+
+            // Get current filters for this column
+            const currentFilters = columnFilters[column] || [];
+
+            dropdown.innerHTML = `
+                <input type="text" class="filter-search" placeholder="Search values..." 
+                       oninput="filterDropdownOptions(this, '${column}')">
+                <div class="filter-options">
+                    ${uniqueValues.map(val => `
+                        <div class="filter-option">
+                            <input type="checkbox" id="filter-${column}-${val}" 
+                                   value="${val}" ${currentFilters.includes(String(val)) ? 'checked' : ''}>
+                            <label for="filter-${column}-${val}">${val}</label>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="filter-actions">
+                    <button class="filter-btn apply-btn" onclick="applyColumnFilter('${column}')">Apply</button>
+                    <button class="filter-btn clear-btn-small" onclick="clearColumnFilter('${column}')">Clear</button>
+                </div>
+            `;
+
+            th.appendChild(dropdown);
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function closeDropdown(e) {
+                if (!dropdown.contains(e.target) && e.target !== th) {
+                    dropdown.remove();
+                    document.removeEventListener('click', closeDropdown);
+                }
+            });
+
+            event.stopPropagation();
+        }
+
+        function filterDropdownOptions(searchInput, column) {
+            const searchValue = searchInput.value.toLowerCase();
+            const options = searchInput.nextElementSibling.querySelectorAll('.filter-option');
+            
+            options.forEach(option => {
+                const text = option.textContent.toLowerCase();
+                option.style.display = text.includes(searchValue) ? 'flex' : 'none';
+            });
+        }
+
+        function applyColumnFilter(column) {
+            const dropdown = event.target.closest('.filter-dropdown');
+            const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]:checked');
+            const selectedValues = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedValues.length === 0) {
+                delete columnFilters[column];
+            } else {
+                columnFilters[column] = selectedValues;
+            }
+
+            // Update header styling
+            const th = dropdown.parentElement;
+            th.classList.toggle('filtered', selectedValues.length > 0);
+
+            dropdown.remove();
+            updateTableData();
+        }
+
+        function clearColumnFilter(column) {
+            delete columnFilters[column];
+            
+            const dropdown = event.target.closest('.filter-dropdown');
+            const th = dropdown.parentElement;
+            th.classList.remove('filtered');
+            
+            dropdown.remove();
+            updateTableData();
+        }
+
+        function updateTableData() {
+            const tbody = document.getElementById('unified-tbody');
+            if (!tbody) return;
+
+            // Apply filters
+            let data = currentData.filter(row => {
+                for (const [filterColumn, filterValues] of Object.entries(columnFilters)) {
+                    let cellValue;
+                    if (filterColumn === 'Row') {
+                        cellValue = String(row.rowIndex + 1);
+                    } else if (filterColumn === 'PacketType') {
+                        cellValue = String(row.packetType);
+                    } else if (filterColumn === 'TypeName') {
+                        cellValue = String(row.typeName);
+                    } else {
+                        cellValue = String(row.data[filterColumn] || '');
+                    }
+
+                    if (!filterValues.includes(cellValue)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Update filtered data
+            filteredData = data;
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No data matches the current filters</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(row => `
+                <tr class="packet-type-${row.packetType}" 
+                    onmouseenter="showRowDetails(event, ${JSON.stringify(row).replace(/"/g, '&quot;')})"
+                    onmouseleave="hideRowDetails()">
+                    <td>${row.rowIndex + 1}</td>
+                    <td><span class="packet-type-badge badge-${row.packetType}">Type ${row.packetType}</span></td>
+                    <td>${row.typeName}</td>
+                    <td>${row.data.PacketLen || ''}</td>
+                    <td>${row.data.FrameNum || ''}</td>
+                    <td><em>Hover to see all columns</em></td>
+                </tr>
+            `).join('');
+        }
+
+        function showRowDetails(event, rowData) {
+            const details = document.getElementById('rowDetails');
+            const packetInfo = PACKET_TYPES[rowData.packetType];
+            
+            let detailsHTML = `<h4>${rowData.typeName} Packet (Type ${rowData.packetType})</h4>`;
+            
+            packetInfo.columns.forEach(col => {
+                const value = rowData.data[col] || 'N/A';
+                detailsHTML += `
+                    <div class="detail-item">
+                        <span class="detail-label">${col}:</span>
+                        <span class="detail-value">${value}</span>
+                    </div>
+                `;
+            });
+            
+            details.innerHTML = detailsHTML;
+            details.style.display = 'block';
+            
+            // Position tooltip near mouse
+            const rect = event.target.getBoundingClientRect();
+            // Position tooltip horizontally (right/left of mouse) and keep inside viewport
+            const padding = 20;
+            const tooltipWidth = details.offsetWidth;
+            const tooltipHeight = details.offsetHeight;
+            const mouseX = event.pageX;
+            const mouseY = event.pageY;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let left = mouseX + 15; // Default: to the right
+            if (left + tooltipWidth + padding > viewportWidth) {
+                left = mouseX - tooltipWidth - 15; // Flip to the left if overflowing
+                if (left < 0) left = padding;
+            }
+
+            let top = mouseY - tooltipHeight / 2; // Center vertically around cursor
+            if (top + tooltipHeight + padding > viewportHeight) {
+                top = viewportHeight - tooltipHeight - padding;
+            }
+            if (top < 0) top = padding;
+
+            details.style.left = `${left}px`;
+            details.style.top = `${top}px`;
+
+
+        }
+
+        function hideRowDetails() {
+            document.getElementById('rowDetails').style.display = 'none';
+        }
+
+        function clearData() {
+            currentData = [];
+            filteredData = [];
+            columnFilters = {};
+            document.getElementById('fileInput').value = '';
+            document.getElementById('stats').style.display = 'none';
+            document.getElementById('packetSections').innerHTML = '<div id="noData" class="no-data"><p>📂 Please upload an XLSX file to begin packet analysis</p></div>';
+        }
+    </script>
+</body>
+</html>
